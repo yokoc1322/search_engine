@@ -57,18 +57,20 @@ def content_to_json(input_file, output) -> None:
 
         with open(output, 'w', encoding='utf-8') as file:
             file.write(json.dumps(doc, ensure_ascii=False))
-    except:
+    except Exception as e:
         print("Error!")
         print(input_file)
+        print(e)
 
 
-data_dir = get_data_path()
-files = listup_content_path()
-files_with_output = [
-    {
-        'in': filepath,
-        'out': data_dir / 'json' / (filepath.name + '.json')}
-    for filepath in files
-]
-for f in files_with_output:
-    content_to_json(f['in'], f['out'])
+if __name__ == '__main__':
+    data_dir = get_data_path()
+    files = listup_content_path()
+    files_with_output = [
+        {
+            'in': filepath,
+            'out': data_dir / 'json' / (filepath.name + '.json')}
+        for filepath in files
+    ]
+    for f in files_with_output:
+        content_to_json(f['in'], f['out'])
