@@ -1,10 +1,21 @@
 import json
-from utils import create_ngram, get_data_path
-from index_type import Postings
 from pprint import pprint
-from typing import Set, Type, TypedDict, List, Dict, Optional
+from typing import List, Dict, List, Optional, Set, Type, TypedDict
+
+from index_type import Postings
+from utils import create_ngram, get_data_path
 
 GRAM = 2
+
+
+class IntermidiateDoc(TypedDict):
+    positions: List[int]
+    sum_tf_idf: float
+
+
+class SearchResultItem(TypedDict):
+    docID: str
+    sum_tf_idf: float
 
 
 def load_index() -> Postings:
@@ -28,9 +39,9 @@ def normal_search(query_text: str, index: Postings) -> Set[str]:
     return candidate
 
 
-def phrase_search(query_text: str, index: Postings) -> Set[str]:
+def phrase_search(query_text: str, index: Postings) -> List[SearchResultItem]:
     query_grams = create_ngram(GRAM, query_text)
-    Intermidiate = Dict[str, List[int]]   # docID: positions
+    Intermidiate = Dict[str, IntermidiateDoc]   # [key=docID]
 
     intermidiate: Optional[Intermidiate] = None
     for term in query_grams:
@@ -40,7 +51,10 @@ def phrase_search(query_text: str, index: Postings) -> Set[str]:
             if term not in index:
                 return set()
             for docID in index[term]['docs'].keys():
-                next_intermidiate[docID] = index[term]['docs'][docID]['position']
+                next_intermidiate[docID] = {
+                    'positions': index[term]['docs'][docID]['position'],
+                    'sum_tf_idf': index[term]['docs'][docID]['tf_idf']
+                }
         # 2回目以降は、以前のternと離れてないやつを残していく
         else:
             # 単語が見つからない
@@ -53,7 +67,7 @@ def phrase_search(query_text: str, index: Postings) -> Set[str]:
                 if docID not in intermidiate:
                     continue
 
-                prev_positions = intermidiate[docID]
+                prev_positions = intermidiate[docID]['positions']
                 continue_positions = []
                 for np in next_positions:
                     for pp in prev_positions:
@@ -61,15 +75,32 @@ def phrase_search(query_text: str, index: Postings) -> Set[str]:
                             continue_positions.append(np)
                             break
                 if len(continue_positions) != 0:
-                    next_intermidiate[docID] = continue_positions
+                    current_tf_idf = intermidiate[docID]['sum_tf_idf']
+                    next_intermidiate[docID] = {
+                        'positions': continue_positions,
+                        'sum_tf_idf': current_tf_idf + index[term]['docs'][docID]['tf_idf']
+                    }
 
         intermidiate = next_intermidiate
 
-    return set(intermidiate.keys()) if intermidiate is not None else set()
+    if intermidiate is not None:
+        intermidiate_list = [
+            {
+                'docID': docID,
+                'sum_tf_idf': intermidiate[docID]['sum_tf_idf']
+
+            } for docID in intermidiate
+        ]
+
+        intermidiate_list.sort(key=lambda doc: doc['sum_tf_idf'], reverse=True)
+        return intermidiate_list
+    else:
+        return []
 
 
 if __name__ == '__main__':
     index = load_index()
     # ret = normal_search("ジョバンニ", index)
-    ret = phrase_search("ジョバンニ", index)
+    # ret = phrase_search("ジョバンニ", index)
+    ret = phrase_search("こんにちは", index)
     pprint(ret)
