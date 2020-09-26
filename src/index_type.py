@@ -16,7 +16,7 @@ class PostingDoc(TypedDict, total=False):
 
 class Posting(TypedDict, total=False):
     num: int
-    docs: Dict[str, PostingDoc]  # [key=docID]
+    docs: Dict[str, PostingDoc]  # [key=doc_id]
     idf: float
 
 

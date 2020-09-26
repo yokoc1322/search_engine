@@ -6,8 +6,8 @@ from utils import create_ngram, get_data_path
 from index_type import Doc, Postings, PostingDoc
 
 
-# docID == filename
-def create_postings(docID: str, doc: Doc, postings: Postings):
+# doc_id == filename
+def create_postings(doc_id: str, doc: Doc, postings: Postings):
     terms = create_ngram(2, doc['content'])
     for i, term in enumerate(terms):
         if term not in postings:
@@ -16,16 +16,16 @@ def create_postings(docID: str, doc: Doc, postings: Postings):
                 'docs': {}
             }
 
-        if docID not in postings[term]['docs']:
+        if doc_id not in postings[term]['docs']:
             position_doc: PostingDoc = {
                 'num': 0,
                 'position': []
             }
-            postings[term]['docs'][docID] = position_doc
+            postings[term]['docs'][doc_id] = position_doc
 
         postings[term]['num'] += 1
-        postings[term]['docs'][docID]['num'] += 1
-        postings[term]['docs'][docID]['position'].append(i)
+        postings[term]['docs'][doc_id]['num'] += 1
+        postings[term]['docs'][doc_id]['position'].append(i)
 
 
 def read_json(path: Path) -> Doc:
