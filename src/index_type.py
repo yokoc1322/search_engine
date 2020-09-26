@@ -7,14 +7,17 @@ class Doc(TypedDict):
     content: str
 
 
-class PostingDoc(TypedDict):
+class PostingDoc(TypedDict, total=False):
     num: int
     position: List[int]
+    tf: int
+    tf_idf: float
 
 
-class Posting(TypedDict):
+class Posting(TypedDict, total=False):
     num: int
     docs: Dict[str, PostingDoc]  # [key=docID]
+    idf: float
 
 
 Postings = Dict[str, Posting]  # [key=term]
