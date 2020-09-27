@@ -21,3 +21,17 @@ class Posting(TypedDict, total=False):
 
 
 Postings = Dict[str, Posting]  # [key=term]
+
+
+class DBPosting(TypedDict):
+    term: str
+    doc_id: str
+    tf_idf: float
+    positions: List[int]
+
+
+class DBPostingRaw(TypedDict):
+    term: str
+    doc_id: str
+    tf_idf: float
+    positions: str  # jsonのlist
