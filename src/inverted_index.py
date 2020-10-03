@@ -7,7 +7,7 @@ from pprint import pprint
 
 from index_type import Doc, PostingDoc, Postings, DBPosting, DBPostingRaw
 from utils import create_ngram, get_data_path
-from constants import GRAM, INDEX_TABLE_NAME, DB_FILE_NAME
+from constants import GRAM, INDEX_TABLE_NAME, DB_FILE_NAME, JSON_DIR_NAME
 
 data_dir_path = get_data_path()
 db_path = data_dir_path / DB_FILE_NAME
@@ -74,7 +74,7 @@ def add_postings():
             )
             conn.commit()
 
-    origin_file_dir = data_dir_path / 'json'
+    origin_file_dir = data_dir_path / JSON_DIR_NAME
     json_files = list(origin_file_dir.glob('*.json'))
 
     values: SQLValues = []

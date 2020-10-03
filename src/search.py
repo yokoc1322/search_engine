@@ -1,11 +1,14 @@
 import json
+import sqlite3
 from pprint import pprint
-from typing import List, Dict, List, Optional, Set, Type, TypedDict
+from typing import Dict, List, Optional, Set, Type, TypedDict
 
-from index_type import Postings
+from constants import DB_FILE_NAME, GRAM, INDEX_TABLE_NAME
+from index_type import DBPosting, Postings
 from utils import create_ngram, get_data_path
 
-GRAM = 2
+data_dir_path = get_data_path()
+db_path = data_dir_path / DB_FILE_NAME
 
 
 class IntermidiateDoc(TypedDict):
@@ -18,74 +21,82 @@ class SearchResultItem(TypedDict):
     sum_tf_idf: float
 
 
-def load_index() -> Postings:
-    data_dir = get_data_path()
-    with open(data_dir / 'inverted_index.json', 'r', encoding='utf-8') as file:
-        content = file.read()
-        return json.loads(content)
+Intermidiate = Dict[str, IntermidiateDoc]  # [key=doc_id]
 
 
-def search(query_text: str, index: Postings) -> List[SearchResultItem]:
-    query_grams = create_ngram(GRAM, query_text)
-    Intermidiate = Dict[str, IntermidiateDoc]   # [key=doc_id]
+def search(query_text: str) -> List[SearchResultItem]:
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
 
-    intermidiate: Optional[Intermidiate] = None
-    for term in query_grams:
-        next_intermidiate: Intermidiate = {}
-        # 最初は出たやつすべて記録
-        if intermidiate is None:
-            if term not in index:
-                return set()
-            for doc_id in index[term]['docs'].keys():
-                next_intermidiate[doc_id] = {
-                    'positions': index[term]['docs'][doc_id]['position'],
-                    'sum_tf_idf': index[term]['docs'][doc_id]['tf_idf']
-                }
-        # 2回目以降は、以前のternと離れてないやつを残していく
-        else:
-            # 単語が見つからない
-            if term not in index:
-                return set()
-            for doc_id in index[term]['docs'].keys():
-                next_positions = index[term]['docs'][doc_id]['position']
+        def get_docs_by_term(term: str) -> List[DBPosting]:
+            c = conn.cursor()
+            db_docs = c.execute("""
+                SELECT term, doc_id, tf_idf, positions
+                FROM {}
+                WHERE term=?
+            """.format(INDEX_TABLE_NAME), (term,))
+            return [{
+                'term': doc['term'],
+                'doc_id': doc['doc_id'],
+                'tf_idf': doc['tf_idf'],
+                'positions': json.loads(doc['positions'])
+            } for doc in db_docs]
 
-                # まだ一度も出て生きていない単語
-                if doc_id not in intermidiate:
-                    continue
+        query_grams = create_ngram(GRAM, query_text)
 
-                prev_positions = intermidiate[doc_id]['positions']
-                continue_positions = []
-                for np in next_positions:
-                    for pp in prev_positions:
-                        if np - pp == 1:
-                            continue_positions.append(np)
-                            break
-                if len(continue_positions) != 0:
-                    current_tf_idf = intermidiate[doc_id]['sum_tf_idf']
-                    next_intermidiate[doc_id] = {
-                        'positions': continue_positions,
-                        'sum_tf_idf': current_tf_idf + index[term]['docs'][doc_id]['tf_idf']
+        intermidiate: Optional[Intermidiate] = None
+        for term in query_grams:
+            next_intermidiate: Intermidiate = {}
+            docs = get_docs_by_term(term)
+
+            if intermidiate is None:
+                for doc in docs:
+                    next_intermidiate[doc['doc_id']] = {
+                        'positions': doc['positions'],
+                        'sum_tf_idf': doc['tf_idf']
                     }
+            else:
+                for doc in docs:
+                    doc_id = doc['doc_id']
+                    positions = doc['positions']
+                    tf_idf = doc['tf_idf']
 
-        intermidiate = next_intermidiate
+                    # まだ一度も出てきていない単語
+                    if doc_id not in intermidiate:
+                        continue
 
-    if intermidiate is not None:
-        intermidiate_list = [
-            {
-                'doc_id': doc_id,
-                'sum_tf_idf': intermidiate[doc_id]['sum_tf_idf']
+                    prev_positions = intermidiate[doc_id]['positions']
+                    continue_positions = []
+                    for p in positions:
+                        for pp in prev_positions:
+                            if p - pp == 1:
+                                continue_positions.append(p)
+                                break
+                    if len(continue_positions) != 0:
+                        prev_tf_idf = intermidiate[doc_id]['sum_tf_idf']
+                        next_intermidiate[doc_id] = {
+                            'positions': continue_positions,
+                            'sum_tf_idf': prev_tf_idf + tf_idf
+                        }
 
-            } for doc_id in intermidiate
-        ]
+            intermidiate = next_intermidiate
 
-        intermidiate_list.sort(key=lambda doc: doc['sum_tf_idf'], reverse=True)
-        return intermidiate_list
-    else:
-        return []
+        if intermidiate is not None:
+            intermidiate_list = [
+                {
+                    'doc_id': doc_id,
+                    'sum_tf_idf': intermidiate[doc_id]['sum_tf_idf']
+
+                } for doc_id in intermidiate
+            ]
+            intermidiate_list.sort(
+                key=lambda doc: doc['sum_tf_idf'], reverse=True)
+            return intermidiate_list
+        else:
+            return []
 
 
 if __name__ == '__main__':
-    index = load_index()
-    # ret = search("ジョバンニ", index)
-    ret = search("こんにちは", index)
+    # ret = search("ジョバンニ")
+    ret = search("こんにちは")
     pprint(ret)
