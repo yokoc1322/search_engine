@@ -93,7 +93,7 @@ def scoring_tf_idf():
 
     def get_doc_num() -> int:
         c = conn.cursor()
-        sql = "SELECT COUNT(*) FROM {}".format(INDEX_TABLE_NAME)
+        sql = "SELECT COUNT(DISTINCT doc_id) FROM {}".format(INDEX_TABLE_NAME)
         ret = c.execute(sql)
         return ret.fetchone()[0]
 
